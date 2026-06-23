@@ -1,0 +1,8 @@
+﻿server/.env
+server/__pycache__/
+server/**/__pycache__/
+server/*.sqlite3
+server/db.sqlite3
+server/chroma_storage/
+web/node_modules/
+web/dist/
