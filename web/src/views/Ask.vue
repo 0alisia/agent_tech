@@ -60,8 +60,8 @@
         <span class="tag gray" style="font-size:11px">Chroma RAG · Qwen</span>
         <span class="tag" style="font-size:11px">{{ role === 'teacher' ? '教师视角' : '学生视角' }}</span>
       </div>
-      <div v-if="loading" class="answer-loading"><span></span><span></span><span></span></div>
-      <div v-else class="answer markdown-body" v-html="renderMarkdown(answer)"></div>
+      <div v-if="loading && !answer" class="answer-loading"><span></span><span></span><span></span></div>
+      <div v-else class="answer markdown-body" v-html="renderMarkdown(streamingAnswer)"></div>
     </div>
 
     <div class="grid training-columns card-gap">
@@ -161,6 +161,9 @@ export default {
         ? '教师版会更强调教学目标、易错点、评价依据和反馈用语。'
         : '学生版会更强调问题判断、操作步骤、安全提醒和实验记录。'
     },
+    streamingAnswer() {
+      return this.loading && this.answer ? `${this.answer}\n\n▌` : this.answer
+    },
   },
   methods: {
     applyTemplate(item) {
@@ -191,8 +194,36 @@ export default {
       this.loading = true
       this.answer = ''
       try {
-        const res = await request.post('/rag/ask/', { question: this.buildQuestion() })
-        this.answer = res.data.answer || ''
+        const response = await fetch(this.streamApiUrl(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Token ${localStorage.getItem('token') || ''}`,
+          },
+          body: JSON.stringify({ question: this.buildQuestion() }),
+        })
+        if (!response.ok) {
+          const errorText = await response.text()
+          try {
+            const errorData = JSON.parse(errorText)
+            this.answer = errorData.message || '请求失败，请稍后重试'
+          } catch {
+            this.answer = errorText || '请求失败，请稍后重试'
+          }
+          return
+        }
+        if (!response.body) {
+          this.answer = '当前浏览器不支持流式输出'
+          return
+        }
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder('utf-8')
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          this.answer += decoder.decode(value, { stream: true })
+        }
+        this.answer += decoder.decode()
         await this.loadHistory()
       } catch (e) {
         this.answer = e.response?.data?.message || '请求失败，请稍后重试'
@@ -203,6 +234,12 @@ export default {
     async loadHistory() {
       const res = await request.get('/rag/history/')
       this.history = res.data || []
+    },
+    streamApiUrl() {
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+        return 'http://127.0.0.1:8000/api/rag/ask-stream/'
+      }
+      return '/api/rag/ask-stream/'
     },
     escapeHtml(v) { return String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') },
     formatInline(v) { return v.replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>') },

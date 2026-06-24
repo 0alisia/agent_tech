@@ -104,7 +104,7 @@ class ChromaEngine:
             items.append({'text': doc, 'meta': meta, 'score': 1 - dist})
         return items
 
-    def query(self, question):
+    def _build_messages(self, question):
         chunks = self.search(question, n_results=5)
         if not chunks:
             context = '（知识库暂无相关文档，请先执行索引构建）'
@@ -137,17 +137,43 @@ class ChromaEngine:
             f'用户问题：{question}\n\n'
             '请使用较详细的中文回答，适当使用小标题或编号，让学生能够直接按回答完成实训操作或排查。'
         )
+        return [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_prompt},
+        ]
 
+    def _extract_response_text(self, response):
+        content = response.output.choices[0].message.content
+        if isinstance(content, list):
+            return content[0].get('text', '')
+        return content or ''
+
+    def query(self, question):
         resp = MultiModalConversation.call(
             model=self.chat_model,
-            messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_prompt},
-            ],
+            messages=self._build_messages(question),
             temperature=0.3,
             max_tokens=3072,
             enable_thinking=False,
         )
         if resp.status_code != HTTPStatus.OK:
             raise RuntimeError(f'Generation 调用失败：{resp.code} {resp.message}')
-        return resp.output.choices[0].message.content[0]['text']
+        return self._extract_response_text(resp)
+
+    def query_stream(self, question):
+        responses = Generation.call(
+            model=self.chat_model,
+            messages=self._build_messages(question),
+            temperature=0.3,
+            max_tokens=3072,
+            result_format='message',
+            stream=True,
+            incremental_output=True,
+            enable_thinking=False,
+        )
+        for resp in responses:
+            if resp.status_code != HTTPStatus.OK:
+                raise RuntimeError(f'Generation 调用失败：{resp.code} {resp.message}')
+            text = self._extract_response_text(resp)
+            if text:
+                yield text

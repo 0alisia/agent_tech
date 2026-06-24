@@ -1,5 +1,5 @@
 import json
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_GET
 from accounts.auth import token_required
@@ -37,6 +37,49 @@ def ask(request):
         context='Chroma RAG',
     )
     return JsonResponse({'code': 0, 'data': {'id': record.id, 'question': question, 'answer': answer}})
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@token_required
+def ask_stream(request):
+    data = body_json(request)
+    question = (data.get('question') or '').strip()
+    if len(question) < 2:
+        return JsonResponse({'code': 400, 'message': '请输入有效问题'}, status=400)
+
+    user = request.app_user
+
+    def stream_answer():
+        answer_parts = []
+        try:
+            engine = ChromaEngine()
+            for chunk in engine.query_stream(question):
+                answer_parts.append(chunk)
+                yield chunk.encode('utf-8')
+        except RuntimeError as exc:
+            message = f'\n\n[生成失败] {exc}'
+            answer_parts.append(message)
+            yield message.encode('utf-8')
+        except Exception as exc:
+            message = f'\n\n[生成失败] 问答失败：{exc}'
+            answer_parts.append(message)
+            yield message.encode('utf-8')
+        finally:
+            answer = ''.join(answer_parts).strip()
+            if answer:
+                ChatRecord.objects.create(
+                    user=user,
+                    question=question,
+                    answer=answer,
+                    context='Chroma RAG Stream',
+                )
+
+    response = StreamingHttpResponse(stream_answer(), content_type='text/plain; charset=utf-8')
+    response['Cache-Control'] = 'no-cache'
+    response['Content-Encoding'] = 'identity'
+    response['X-Accel-Buffering'] = 'no'
+    return response
 
 
 @csrf_exempt
