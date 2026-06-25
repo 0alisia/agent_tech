@@ -6,3 +6,6 @@ server/db.sqlite3
 server/chroma_storage/
 web/node_modules/
 web/dist/
+
+works
+.local/

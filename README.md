@@ -83,13 +83,13 @@ code/
 │   ├── forum/           # 飞手论坛
 │   ├── rag/             # RAG 问答、天气评估、向量索引
 │   ├── dronekg/         # Django 项目配置
-│   ├── db.sqlite3       # 本地数据库
-│   └── requirements.txt
+│   └── db.sqlite3       # 本地数据库
 ├── web/                 # Vue 前端
 │   ├── src/views/       # 页面组件
 │   ├── src/api/         # Axios 请求封装
 │   ├── src/router/      # 前端路由
 │   └── package.json
+├── requirements.txt     # 后端 Python 依赖
 └── README.md
 ```
 
@@ -115,25 +115,57 @@ HEFENG_API_HOST=https://你的和风天气API_HOST
 
 ## 运行步骤
 
-### 1. 启动后端
+### 1. 创建 Conda 环境
 
-```powershell
-cd C:\Users\lishu\Desktop\code\code\server
+项目后端推荐使用 Conda 环境运行，环境名为 `drone-rag`。
+
+```bash
+conda create -n drone-rag python=3.12 -y
+conda activate drone-rag
 pip install -r requirements.txt
+```
+
+### 2. 初始化数据库
+
+```bash
+cd server
+python manage.py migrate
+```
+
+如需创建 README 中的测试账号，可执行：
+
+```bash
+python manage.py shell
+```
+
+进入 shell 后执行：
+
+```python
+from accounts.models import AppUser
+user, _ = AppUser.objects.get_or_create(username='demo', defaults={'nickname': 'demo'})
+user.set_password('demo123456')
+user.save()
+```
+
+### 3. 启动后端
+
+```bash
+conda activate drone-rag
+cd server
 python manage.py runserver 127.0.0.1:8000
 ```
 
-### 2. 启动前端
+### 4. 启动前端
 
-另开一个 PowerShell 窗口：
+另开一个终端窗口：
 
-```powershell
-cd C:\Users\lishu\Desktop\code\code\web
+```bash
+cd web
 npm install
 npm run serve
 ```
 
-### 3. 打开系统
+### 5. 打开系统
 
 浏览器访问：
 
@@ -194,4 +226,3 @@ GET /api/rag/search-preview/?q=关键词
 - 不要提交 `.env`、数据库、向量库、`node_modules`、构建产物等本地文件。
 - API Key 一旦公开，建议立即在控制台重新生成。
 - 天气飞行评估结果仅作为教学和实训辅助，真实飞行仍需遵守当地法规、学校安全制度和现场教师要求。
-
