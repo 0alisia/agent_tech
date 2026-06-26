@@ -5,6 +5,10 @@ module.exports = {
       '/api': {
         changeOrigin: true,
         target: 'http://127.0.0.1:8000'
+      },
+      '/media': {
+        changeOrigin: true,
+        target: 'http://127.0.0.1:8000'
       }
     }
   }

@@ -375,6 +375,67 @@ label.field-label:first-child { margin-top: 0; }
 .insight-item { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--surface2); }
 .insight-item b { display: block; margin-bottom: 4px; }
 .insight-item p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+.solder-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.solder-grid { display: grid; grid-template-columns: minmax(260px, .9fr) minmax(320px, 1.1fr); gap: 16px; align-items: start; }
+.solder-upload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--accent-light);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+}
+.solder-upload input { display: none; }
+.solder-preview {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface2);
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+}
+.solder-preview.annotated { margin-bottom: 12px; }
+.solder-preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.solder-empty,
+.solder-result-empty {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface2);
+  color: var(--muted);
+  text-align: center;
+  padding: 18px;
+}
+.solder-result { min-width: 0; }
+.solder-status { margin-top: 12px; margin-bottom: 0; }
+.score-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background: var(--surface2);
+}
+.score-value { font-size: 34px; font-weight: 700; color: var(--accent); line-height: 1; }
+.score-meta { margin-top: 8px; text-align: right; }
+.solder-table-wrap { overflow-x: auto; margin-bottom: 12px; }
+.solder-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.solder-table th,
+.solder-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.solder-table th { color: var(--text-secondary); font-weight: 600; background: var(--surface2); }
 .ask-toolbar { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: start; }
 .mode-switch { display: flex; gap: 8px; flex-wrap: wrap; }
 .mode-btn {
@@ -408,6 +469,7 @@ label.field-label:first-child { margin-top: 0; }
 @media (max-width: 960px) {
   .training-workbench,
   .training-columns,
+  .solder-grid,
   .ask-toolbar,
   .report-grid { grid-template-columns: 1fr; }
 }

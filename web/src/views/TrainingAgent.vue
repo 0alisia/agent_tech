@@ -64,6 +64,91 @@
       </div>
     </div>
 
+    <div class="card card-gap training-surface">
+      <div class="solder-header">
+        <div class="panel-title">
+          <span class="tag warn">AI质检</span>
+          <h3>PCB缺陷检测与评分</h3>
+        </div>
+        <span v-if="solderResult" class="tag gray">
+          {{ solderResult.model.device === 'cpu' ? 'CPU推理' : 'GPU推理' }} · YOLO11
+        </span>
+      </div>
+      <div class="solder-grid">
+        <div>
+          <label class="solder-upload">
+            <input type="file" accept="image/*" @change="onSolderFileChange">
+            <span>{{ solderFile ? solderFile.name : '选择或拍摄PCB图片' }}</span>
+          </label>
+          <div v-if="solderPreview" class="solder-preview">
+            <img :src="solderPreview" alt="PCB原图预览">
+          </div>
+          <div v-else class="solder-empty">上传PCB图像后开始缺陷检测</div>
+          <div class="training-actions">
+            <button class="btn" :disabled="solderLoading || !solderFile" @click="inspectSolder">
+              <span v-if="solderLoading" class="spinner"></span>
+              {{ solderLoading ? '检测中...' : '开始PCB质检' }}
+            </button>
+            <button class="btn ghost" :disabled="solderLoading || !solderResult" @click="openAsk(solderExplainPrompt, 'teacher')">
+              生成讲解建议
+            </button>
+          </div>
+          <div v-if="solderError" class="status-bar err solder-status">{{ solderError }}</div>
+        </div>
+
+        <div class="solder-result">
+          <div v-if="!solderResult && !solderLoading" class="solder-result-empty">
+            检测完成后显示总分、缺陷清单和改进建议。
+          </div>
+          <div v-if="solderLoading" class="solder-result-empty">
+            <span class="spinner dark"></span>
+            正在调用YOLO模型推理...
+          </div>
+          <template v-if="solderResult">
+            <div class="score-line">
+              <div>
+                <div class="score-value">{{ solderResult.score }}</div>
+                <div class="muted">本次PCB质检得分</div>
+              </div>
+              <div>
+                <span class="tag" :class="solderGradeClass">{{ solderResult.grade }}</span>
+                <div class="muted score-meta">扣分 {{ solderResult.total_deduct }} · 缺陷 {{ solderResult.detections.length }} 处</div>
+              </div>
+            </div>
+            <div class="status-bar" :class="solderStatusClass">{{ solderResult.summary }}</div>
+
+            <div v-if="solderResult.annotated_image_url" class="solder-preview annotated">
+              <img :src="assetUrl(solderResult.annotated_image_url)" alt="PCB缺陷检测标注图">
+            </div>
+
+            <div v-if="solderResult.detections.length" class="solder-table-wrap">
+              <table class="solder-table">
+                <thead>
+                  <tr>
+                    <th>缺陷类型</th>
+                    <th>置信度</th>
+                    <th>扣分</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(item, index) in solderResult.detections" :key="index">
+                    <td>{{ item.label || item.class_name }}</td>
+                    <td>{{ percent(item.confidence) }}</td>
+                    <td>{{ item.deduct ? '-' + item.deduct : '不计分' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <label class="field-label">改进建议</label>
+            <ol class="training-list compact">
+              <li v-for="tip in solderResult.suggestions" :key="tip">{{ tip }}</li>
+            </ol>
+          </template>
+        </div>
+      </div>
+    </div>
+
     <div class="grid training-columns card-gap">
       <div class="card training-surface">
         <div class="panel-title">
@@ -142,6 +227,8 @@
 </template>
 
 <script>
+import request from '../api/request'
+
 export default {
   data() {
     const tasks = [
@@ -247,10 +334,20 @@ export default {
         { title: '易错点提醒', desc: '学生最常见的错误集中在线序接反、螺旋桨方向错误、遥控器通道映射不一致。' },
         { title: '过程评价', desc: '可从安全规范、日志记录、故障定位依据、改进方案四个维度进行评价。' },
       ],
+      solderFile: null,
+      solderPreview: '',
+      solderLoading: false,
+      solderError: '',
+      solderResult: null,
     }
   },
   created() {
     this.activeFault = this.faults[0]
+  },
+  beforeDestroy() {
+    if (this.solderPreview) {
+      URL.revokeObjectURL(this.solderPreview)
+    }
   },
   computed: {
     safetyStatus() {
@@ -278,6 +375,28 @@ export default {
     teacherSummaryPrompt() {
       return '请以教师视角生成一段课堂反馈摘要，内容包括学生完成进度、共性问题、风险提醒和下次课建议。'
     },
+    solderStatusClass() {
+      if (!this.solderResult) return ''
+      if (this.solderResult.score >= 80) return 'ok'
+      if (this.solderResult.score >= 60) return 'warn'
+      return 'err'
+    },
+    solderGradeClass() {
+      if (!this.solderResult) return 'gray'
+      if (this.solderResult.score >= 80) return 'success'
+      if (this.solderResult.score >= 60) return 'warn'
+      return 'warn'
+    },
+    solderExplainPrompt() {
+      if (!this.solderResult) {
+        return '请生成一段PCB缺陷检测讲解建议。'
+      }
+      const defects = this.solderResult.detections
+        .filter(item => item.scored)
+        .map(item => `${item.label || item.class_name}，扣${item.deduct}分，置信度${this.percent(item.confidence)}`)
+        .join('；') || '未检测到计分缺陷'
+      return `请以无人机实训教师视角，针对一次PCB缺陷AI检测结果生成讲解建议。得分：${this.solderResult.score}，等级：${this.solderResult.grade}，检测摘要：${this.solderResult.summary}，缺陷明细：${defects}。请说明缺陷危害、修正方法和下次操作注意事项。`
+    },
   },
   methods: {
     openAsk(question, role = 'student') {
@@ -291,6 +410,39 @@ export default {
     },
     faultPrompt(fault) {
       return `我在无人机实训中遇到“${fault.title}”问题。请按现象判断、可能原因、验证方法、处理步骤、安全提醒五部分详细排查。`
+    },
+    onSolderFileChange(event) {
+      const file = event.target.files && event.target.files[0]
+      this.solderError = ''
+      this.solderResult = null
+      this.solderFile = file || null
+      if (this.solderPreview) {
+        URL.revokeObjectURL(this.solderPreview)
+      }
+      this.solderPreview = file ? URL.createObjectURL(file) : ''
+    },
+    async inspectSolder() {
+      if (!this.solderFile) return
+      this.solderLoading = true
+      this.solderError = ''
+      const formData = new FormData()
+      formData.append('file', this.solderFile)
+      try {
+        const res = await request.post('/soldering/inspect-pcb/', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        this.solderResult = res.data
+      } catch (error) {
+        this.solderError = error.response?.data?.message || error.message || 'PCB缺陷检测失败'
+      } finally {
+        this.solderLoading = false
+      }
+    },
+    percent(value) {
+      return `${Math.round((Number(value) || 0) * 100)}%`
+    },
+    assetUrl(url) {
+      return url || ''
     },
   },
 }

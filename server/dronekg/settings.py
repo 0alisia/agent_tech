@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'drones',
     'forum',
     'rag',
+    'soldering',
 ]
 
 MIDDLEWARE = [
@@ -63,6 +64,8 @@ TIME_ZONE = 'Asia/Shanghai'
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = 'static/'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -74,3 +77,15 @@ HEFENG_API_KEY = os.getenv('HEFENG_API_KEY', '')
 HEFENG_API_HOST = os.getenv('HEFENG_API_HOST', '')
 
 CHROMA_PERSIST_DIR = str(BASE_DIR / 'chroma_storage')
+
+SOLDER_YOLO_WEIGHTS = os.getenv(
+    'SOLDER_YOLO_WEIGHTS',
+    str(BASE_DIR / 'weights' / 'yolov8n.pt')
+)
+PCB_DEFECT_YOLO_WEIGHTS = os.getenv(
+    'PCB_DEFECT_YOLO_WEIGHTS',
+    str(BASE_DIR / 'weights' / 'pcb_defect_yolo11_best.pt')
+)
+SOLDER_YOLO_CONF = float(os.getenv('SOLDER_YOLO_CONF', '0.45'))
+SOLDER_YOLO_IMGSZ = int(os.getenv('SOLDER_YOLO_IMGSZ', '960'))
+SOLDER_YOLO_DEVICE = os.getenv('SOLDER_YOLO_DEVICE', 'auto')
