@@ -1,0 +1,11 @@
+Django==4.2.16
+django-cors-headers==4.4.0
+dashscope==1.25.21
+openai>=1.100.0
+python-dotenv==1.0.1
+chromadb>=0.5.0
+cryptography==48.0.1
+ultralytics>=8.3.0
+Pillow>=10.0.0
+einops>=0.8.0
+timm>=1.0.0
